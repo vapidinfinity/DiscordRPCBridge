@@ -33,6 +33,7 @@ public final class DiscordRPCBridge: NSObject, @unchecked Sendable {
         var clientID: String?
         var socketID: Int?
         var processID: Int?
+        var isOpen: Bool = true
 
         init(fileDescriptor: Int32) {
             self.fileDescriptor = fileDescriptor
@@ -223,10 +224,16 @@ public final class DiscordRPCBridge: NSObject, @unchecked Sendable {
     private func socketClose(fileDescriptor: Int32, code: IPC.ResponseCode, message: String? = nil) async {
         self.logger.info("Closing socket on FD \(fileDescriptor) with code \(code.rawValue) and message: \(message ?? "\(code.description) closure")")
 
-        if let client = await clientManager.getClient(fileDescriptor: fileDescriptor),
-           let processID = client.processID,
-           let socketID = client.socketID {
-            await clearActivity(processID: processID, socketID: socketID)
+        if let client = await clientManager.getClient(fileDescriptor: fileDescriptor) {
+           if let processID = client.processID,
+               let socketID = client.socketID {
+                   await clearActivity(processID: processID, socketID: socketID)
+               }
+            if client.isOpen {
+                client.isOpen = false
+            } else {
+                return
+            }
         }
 
         let closePayload = IPC.ClosePayload(code: code.rawValue, message: message ?? "\(code.description) closure")
@@ -277,17 +284,20 @@ public final class DiscordRPCBridge: NSObject, @unchecked Sendable {
      */
     private func startReadLoop(on fileDescriptor: Int32) async {
         self.logger.debug("Starting read loop on FD \(fileDescriptor)")
-        let bufferSize = 65536
+
+        guard let client = await clientManager.getClient(fileDescriptor: fileDescriptor) else { return }
 
         defer {
-            self.logger.debug("Read loop terminated on FD \(fileDescriptor)")
-            Task {
-                await socketClose(fileDescriptor: fileDescriptor, code: IPC.ErrorCode.ratelimited, message: "Read loop terminated")
+            if client.isOpen {
+                Task {
+                    await socketClose(fileDescriptor: fileDescriptor, code: IPC.ErrorCode.ratelimited, message: "Read loop terminated")
+                }
             }
         }
 
         while !Task.isCancelled {
-            guard let message = await readMessage(from: fileDescriptor, bufferSize: bufferSize) else {
+            guard client.isOpen else { return }
+            guard let message = await readMessage(from: fileDescriptor, bufferSize: 65536) else {
                 await socketClose(fileDescriptor: fileDescriptor, code: IPC.ErrorCode.ratelimited, message: "Failed to read message")
                 return
             }
@@ -605,6 +615,11 @@ public final class DiscordRPCBridge: NSObject, @unchecked Sendable {
        - data: The data to send.
      */
     private func write(to fileDescriptor: Int32, data: Data) async {
+        guard let client = await clientManager.getClient(fileDescriptor: fileDescriptor), client.isOpen else {
+            // self.logger.warning("Attempted write on a closed or unknown FD (\(fileDescriptor))")
+            return
+        }
+
         data.withUnsafeBytes { pointer in
             guard let baseAddress = pointer.baseAddress else {
                 self.logger.error("Failed to get base address of data")
