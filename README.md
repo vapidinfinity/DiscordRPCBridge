@@ -1,6 +1,10 @@
 # DiscordRPCBridge
 **by @vapidinfinity**
 
+
+<sub>ignore the low commit count, you'll find that this was initially developed for [Voxa](https://github.com/plyght/Voxa) out of boredom.</sub>
+
+
 A Swift framework that sets up a Unix Domain Socket server to listen for Discord IPC connections and bridges activities into a `WKWebView`. It handles handshake, frame processing, and activity injection while maintaining robust client management and detailed logging.
 
 ## Features
