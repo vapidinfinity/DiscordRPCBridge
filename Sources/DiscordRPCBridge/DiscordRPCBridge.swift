@@ -89,8 +89,8 @@ public final class DiscordRPCBridge: NSObject {
     }
 
     deinit {
-        DispatchQueue.main.sync {
-            stopBridge()
+        Task.detached { [weak self] in
+            await self?.stopBridge()
         }
     }
 
