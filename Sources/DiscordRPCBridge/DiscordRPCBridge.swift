@@ -73,10 +73,6 @@ public final class DiscordRPCBridge: NSObject, @unchecked Sendable {
             clients.removeAll()
             clientSockets.removeAll()
         }
-
-        var allClientSockets: Set<Int32> {
-            return clientSockets
-        }
     }
 
     private let activityQueue = DispatchQueue(label: "activityQueue")
@@ -90,7 +86,7 @@ public final class DiscordRPCBridge: NSObject, @unchecked Sendable {
     }
 
     deinit {
-        stopBridge()
+        serverTask?.cancel()
     }
 
     // MARK: - Public Methods
@@ -100,15 +96,22 @@ public final class DiscordRPCBridge: NSObject, @unchecked Sendable {
 
      - Parameter webView: The WKWebView instance to bridge with.
      */
-    public func startBridge(for webView: WKWebView) async {
+    public func startBridge(for webView: WKWebView) {
         self.webView = webView
         self.logger.info("Starting DiscordRPCBridge")
-        await initialiseRPCServer()
+
+        Task(priority: .utility) {
+            await initialiseRPCServer()
+        }
     }
 
     public func stopBridge() {
-        serverTask?.cancel()
-        Task { @MainActor in
+        self.logger.info("Stopping DiscordRPCBridge")
+        if serverTask?.isCancelled == false {
+            serverTask?.cancel()
+        }
+
+        Task(priority: .medium) {
             await clientManager.closeAllClients()
             await shutdownServers()
         }
@@ -154,9 +157,7 @@ public final class DiscordRPCBridge: NSObject, @unchecked Sendable {
                 self.logger.error("Failed to bind to any IPC sockets from discord-ipc-0 to discord-ipc-9")
             }
         }, onCancel: {
-            Task {
-                await shutdownServers()
-            }
+            stopBridge()
         })
     }
 
