@@ -6,11 +6,12 @@ import WebKit
     let bridge = DiscordRPCBridge()
 
     let mockWebView = WKWebView(frame: .zero)
-    await bridge.startBridge(for: mockWebView)
+    bridge.startBridge(for: mockWebView)
 
-    // Check if the server has started
+    // Wait for server to start
+    try await Task.sleep(for: .seconds(1))
+
     #expect(bridge.isServerReady)
 
-    // Stop the bridge.
     bridge.stopBridge()
 }
