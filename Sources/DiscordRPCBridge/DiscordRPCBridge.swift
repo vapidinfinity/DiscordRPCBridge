@@ -15,7 +15,7 @@ import SwiftUI
  And then bridges and injects activities into a provided WKWebView.
  */
 @MainActor
-final class DiscordRPCBridge: NSObject {
+public final class DiscordRPCBridge: NSObject {
     private let logger = Logger(
         subsystem: (Bundle.main.bundleIdentifier?.appending(".") ?? "") + "DiscordRPCBridge",
         category: "discordRPCBridge"
@@ -84,7 +84,7 @@ final class DiscordRPCBridge: NSObject {
 
     internal var isServerReady = false
 
-    override init() {
+    public override init() {
         super.init()
     }
 
@@ -101,13 +101,13 @@ final class DiscordRPCBridge: NSObject {
 
      - Parameter webView: The WKWebView instance to bridge with.
      */
-    func startBridge(for webView: WKWebView) async {
+    public func startBridge(for webView: WKWebView) async {
         self.webView = webView
         self.logger.info("Starting DiscordRPCBridge")
         await initialiseRPCServer()
     }
 
-    func stopBridge() {
+    public func stopBridge() {
         serverTask?.cancel()
         Task { @MainActor in
             await clientManager.closeAllClients()
