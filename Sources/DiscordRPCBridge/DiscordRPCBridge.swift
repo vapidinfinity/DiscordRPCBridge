@@ -14,11 +14,10 @@ import SwiftUI
  Sets up a Unix Domain Socket server to listen for Discord IPC connections,
  And then bridges and injects activities into a provided WKWebView.
  */
-@MainActor
-public final class DiscordRPCBridge: NSObject {
+public final class DiscordRPCBridge: NSObject, @unchecked Sendable {
     private let logger = Logger(
         subsystem: (Bundle.main.bundleIdentifier?.appending(".") ?? "") + "DiscordRPCBridge",
-        category: "discordRPCBridge"
+        category: "bridge"
     )
 
     private weak var webView: WKWebView?
@@ -84,14 +83,14 @@ public final class DiscordRPCBridge: NSObject {
 
     internal var isServerReady = false
 
+    // static let shared = DiscordRPCBridge()
+
     public override init() {
         super.init()
     }
 
     deinit {
-        Task.detached { [weak self] in
-            await self?.stopBridge()
-        }
+        stopBridge()
     }
 
     // MARK: - Public Methods
@@ -122,7 +121,7 @@ public final class DiscordRPCBridge: NSObject {
         await withTaskCancellationHandler(operation: {
             self.logger.info("Setting up IPC servers")
             guard let temporaryDirectory = ProcessInfo.processInfo.environment["TMPDIR"] else {
-                self.logger.fault("TMPDIR environment variable not set! DiscordRPCBridge has no idea where the unix domain sockets should go 😂😂😂 no rpc")
+                self.logger.fault("TMPDIR environment variable not set! Voxa has no idea where the unix domain sockets should go 😂😂😂 no rpc")
                 return
             }
 
@@ -1299,7 +1298,7 @@ extension DiscordRPCBridge {
     /// Structure handling Unix Domain Socket operations.
     struct UnixDomainSocket {
         private static let logger = Logger(
-            subsystem: (Bundle.main.bundleIdentifier ?? "") + "DiscordRPCBridge",
+            subsystem: Bundle.main.bundleIdentifier ?? "lol.peril.Voxa",
             category: "unixDomainSocket"
         )
 
